@@ -12,9 +12,23 @@ pipeline {
         stage("Docker Image Push") {
             steps {
                 script {
-                    docker.withRegistry("https://index.docker.io/v1/", "dockerhub") {
+                    docker.withRegistry("https://registry.hub.docker.com", "dockerhub") {
                         dockerapp.push("latest")
                         dockerapp.push("${env.BUILD_ID}")
+                    }
+                }
+            }
+        }
+        stage("Deploy K8s") {
+            environment {
+                tag_version = "${env.BUILD_ID}"
+            }
+            steps {
+                script {
+                    withKubeConfig([credentialsId: 'kubeconfig']) {
+                        sh "kubectl apply -f ./k8s/postgre.yaml"
+                        sh 'sed -i "s/{{TAG}}/$tag_version/g" ./k8s/app.yaml'
+                        sh "kubectl apply -f ./k8s/app.yaml"
                     }
                 }
             }
